@@ -334,7 +334,7 @@ export function ScanScreen({ onBack }: ScanScreenProps): React.ReactElement {
               <View style={styles.cancelButtonWrapper}>
                 <Button
                   label="Cancel"
-                  variant="secondary"
+                  variant="danger"
                   onPress={handleClose}
                   isDisabled={state === 'signing' || state === 'submitting'}
                 />
@@ -547,6 +547,6 @@ const styles = StyleSheet.create({
   },
   
   payButtonWrapper: {
-    flex: 2,
+    flex: 1,
   },
 });
