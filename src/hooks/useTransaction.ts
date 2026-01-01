@@ -19,7 +19,7 @@
 
 import { useWallet } from '@lazorkit/wallet-mobile-adapter';
 import { createTransferInstruction, getAssociatedTokenAddress } from '@solana/spl-token';
-import { AddressLookupTableAccount, Connection, PublicKey } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { useCallback, useState } from 'react';
 import {
   ErrorCodes,
@@ -28,11 +28,9 @@ import {
   getRedirectUrl,
   isValidPaymentAmount,
   isValidSolanaAddress,
-  LAZORKIT_ALT_ADDRESS,
   logger,
   NETWORK,
   parseError,
-  RPC_URL,
   USDC_MINT,
   usdcToBaseUnits,
   WalletError,
@@ -69,12 +67,6 @@ export interface SendPaymentParams {
   
   /** Amount in USDC (human-readable, e.g., 10.50) */
   amount: number;
-  
-  /** Optional label/description */
-  label?: string;
-  
-  /** Optional memo */
-  memo?: string;
 }
 
 // =============================================================================
@@ -107,12 +99,11 @@ export function useTransaction(): UseTransactionReturn {
    * 5. Return signature
    */
   const sendPayment = useCallback(async (params: SendPaymentParams): Promise<string> => {
-    const { recipient, amount, label, memo } = params;
+    const { recipient, amount } = params;
     
     logger.info('Transaction', 'Starting payment', { 
       recipient: recipient.slice(0, 8) + '...', 
       amount,
-      label,
     });
 
     // Reset previous state
@@ -174,8 +165,6 @@ export function useTransaction(): UseTransactionReturn {
       amount,
       from: smartWalletPubkey.toString(),
       to: recipient,
-      label,
-      memo,
       createdAt: new Date(),
     };
     
@@ -226,37 +215,7 @@ export function useTransaction(): UseTransactionReturn {
       });
 
       // ========================================
-      // STEP 4: FETCH ADDRESS LOOKUP TABLE
-      // ========================================
-      
-      // WHY: LazorKit gasless transactions add paymaster instructions,
-      // which can push transactions over Solana's 1232-byte limit.
-      // ALTs reduce size by referencing accounts with 1-byte indexes.
-      
-      let addressLookupTableAccounts: AddressLookupTableAccount[] = [];
-      
-      try {
-        const connection = new Connection(RPC_URL, 'confirmed');
-        const altPubkey = new PublicKey(LAZORKIT_ALT_ADDRESS);
-        const altAccountInfo = await connection.getAddressLookupTable(altPubkey);
-        
-        if (altAccountInfo.value) {
-          addressLookupTableAccounts = [altAccountInfo.value];
-          logger.debug('Transaction', 'Loaded Address Lookup Table', {
-            address: LAZORKIT_ALT_ADDRESS.slice(0, 8) + '...',
-            entries: altAccountInfo.value.state.addresses.length,
-          });
-        } else {
-          logger.warn('Transaction', 'ALT not found, proceeding without it');
-        }
-      } catch (altError) {
-        logger.warn('Transaction', 'Failed to load ALT, proceeding without it', { 
-          error: altError instanceof Error ? altError.message : String(altError) 
-        });
-      }
-
-      // ========================================
-      // STEP 5: SIGN AND SEND VIA LAZORKIT (WITH RETRY)
+      // STEP 4: SIGN AND SEND VIA LAZORKIT (WITH RETRY)
       // ========================================
       
       setState('signing');
@@ -264,18 +223,7 @@ export function useTransaction(): UseTransactionReturn {
       
       logger.info('Transaction', 'Requesting signature via LazorKit');
 
-      /**
-       * signAndSendTransaction does the following:
-       * 1. Opens LazorKit portal for passkey authentication
-       * 2. User authenticates with Face ID/Touch ID
-       * 3. Transaction is signed with user's passkey
-       * 4. Transaction is sent to paymaster for execution
-       * 5. Paymaster submits to Solana network
-       * 6. Returns transaction signature
-       * 
-       * RETRY LOGIC: Transaction size can vary slightly between attempts.
-       * We retry up to 3 times if we hit the "Transaction too large" error.
-       */
+      // Retry up to 3 times for transaction size errors
       let txSignature: string | null = null;
       let lastError: Error | null = null;
       const maxRetries = 3;
@@ -288,49 +236,34 @@ export function useTransaction(): UseTransactionReturn {
             {
               instructions: [transferInstruction],
               transactionOptions: {
-                feeToken: 'USDC',             // 🚀 Gasless transaction
-                clusterSimulation: NETWORK,   // Which network to simulate on
-                addressLookupTableAccounts,   // 📦 Reduces transaction size
+                feeToken: 'USDC',
+                clusterSimulation: NETWORK,
               },
             },
-            {
-              redirectUrl: getRedirectUrl(),  // Where to return after signing
-            }
+            { redirectUrl: getRedirectUrl() }
           );
           
-          // Success! Break out of retry loop
           break;
         } catch (err) {
           lastError = err instanceof Error ? err : new Error(String(err));
-          const errorMsg = lastError.message.toLowerCase();
+          const isTransactionTooLarge = lastError.message.toLowerCase().includes('transaction too large');
           
-          // Check if it's a "transaction too large" error
-          if (errorMsg.includes('transaction too large') || errorMsg.includes('1249 > 1232')) {
-            logger.warn('Transaction', `Attempt ${attempt} failed: Transaction too large`);
-            
-            if (attempt < maxRetries) {
-              logger.info('Transaction', `Retrying... (${attempt + 1}/${maxRetries})`);
-              // Small delay before retry
-              await new Promise(resolve => setTimeout(resolve, 500));
-              continue;
-            } else {
-              logger.error('Transaction', 'All retry attempts exhausted');
-              throw lastError;
-            }
-          } else {
-            // For other errors, don't retry
-            logger.error('Transaction', `Non-retryable error: ${errorMsg}`);
-            throw lastError;
+          if (isTransactionTooLarge && attempt < maxRetries) {
+            logger.warn('Transaction', `Attempt ${attempt} failed, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            continue;
           }
+          
+          throw lastError;
         }
       }
       
       if (!txSignature) {
-        throw lastError || new Error('Transaction failed after retries');
+        throw lastError || new Error('Transaction failed');
       }
 
       // ========================================
-      // STEP 6: SUCCESS
+      // STEP 5: SUCCESS
       // ========================================
       
       logger.info('Transaction', 'Transaction successful!', { 

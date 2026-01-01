@@ -137,8 +137,6 @@ export function ScanScreen({ onBack }: ScanScreenProps): React.ReactElement {
       const signature = await sendPayment({
         recipient: paymentData.address,
         amount: parsedAmount,
-        label: paymentData.label,
-        memo: paymentData.memo,
       });
 
       await hapticFeedback('success');

@@ -98,20 +98,6 @@ export const USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
  */
 export const USDC_DECIMALS = 6;
 
-/**
- * LazorKit Address Lookup Table (Devnet)
- * 
- * WHY THIS IS NEEDED:
- * Solana transactions have a 1232-byte limit. LazorKit's gasless transactions
- * add extra instructions for the paymaster, which can exceed this limit.
- * 
- * Address Lookup Tables (ALTs) reduce transaction size by allowing accounts
- * to be referenced by a 1-byte index instead of their 32-byte public key.
- * 
- * This ALT contains common Solana program addresses (Token Program, System, etc.)
- */
-export const LAZORKIT_ALT_ADDRESS = '6s7vQPKAVLzVkJ1szxRE47wbGyhLAGZrb9cTrBc8tnKf';
-
 // =============================================================================
 // DEEP LINKING CONFIGURATION
 // =============================================================================
