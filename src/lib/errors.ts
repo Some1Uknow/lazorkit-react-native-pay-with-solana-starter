@@ -1,34 +1,10 @@
-/**
- * ============================================================================
- * ERROR HANDLING - User-friendly error messages and logging
- * ============================================================================
- * 
- * WHY THIS FILE EXISTS:
- * - Transform cryptic technical errors into human-readable messages
- * - Provide consistent error handling across the app
- * - Enable easy debugging with structured logging
- * - Give users actionable feedback when things go wrong
- */
+// User-friendly error messages and logging
 
-// =============================================================================
-// ERROR TYPES
-// =============================================================================
-
-/**
- * Custom error class for wallet-related errors
- * Includes user-friendly message separate from technical details
- */
+// Custom error class for wallet-related errors
 export class WalletError extends Error {
-  /** User-friendly message to display in UI */
   public readonly userMessage: string;
-  
-  /** Error code for programmatic handling */
   public readonly code: string;
-  
-  /** Whether the error is recoverable (user can retry) */
   public readonly isRecoverable: boolean;
-  
-  /** Original error for debugging */
   public readonly originalError?: Error;
 
   constructor(options: {
@@ -47,23 +23,16 @@ export class WalletError extends Error {
   }
 }
 
-// =============================================================================
-// ERROR CODES
-// =============================================================================
-
 export const ErrorCodes = {
-  // Authentication errors
   AUTH_BIOMETRIC_NOT_AVAILABLE: 'AUTH_BIOMETRIC_NOT_AVAILABLE',
   AUTH_BIOMETRIC_NOT_ENROLLED: 'AUTH_BIOMETRIC_NOT_ENROLLED',
   AUTH_BIOMETRIC_FAILED: 'AUTH_BIOMETRIC_FAILED',
   AUTH_CANCELLED: 'AUTH_CANCELLED',
   AUTH_CONNECTION_FAILED: 'AUTH_CONNECTION_FAILED',
   
-  // Wallet errors
   WALLET_NOT_CONNECTED: 'WALLET_NOT_CONNECTED',
   WALLET_SESSION_EXPIRED: 'WALLET_SESSION_EXPIRED',
   
-  // Transaction errors
   TX_INSUFFICIENT_BALANCE: 'TX_INSUFFICIENT_BALANCE',
   TX_INVALID_AMOUNT: 'TX_INVALID_AMOUNT',
   TX_INVALID_RECIPIENT: 'TX_INVALID_RECIPIENT',
@@ -71,27 +40,17 @@ export const ErrorCodes = {
   TX_SUBMISSION_FAILED: 'TX_SUBMISSION_FAILED',
   TX_CONFIRMATION_TIMEOUT: 'TX_CONFIRMATION_TIMEOUT',
   
-  // Network errors
   NETWORK_ERROR: 'NETWORK_ERROR',
   RPC_ERROR: 'RPC_ERROR',
   
-  // QR errors
   QR_INVALID: 'QR_INVALID',
   QR_CAMERA_PERMISSION: 'QR_CAMERA_PERMISSION',
   
-  // Unknown
   UNKNOWN: 'UNKNOWN',
 } as const;
 
 export type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes];
 
-// =============================================================================
-// ERROR MESSAGES (User-Friendly)
-// =============================================================================
-
-/**
- * Map error codes to user-friendly messages
- */
 export const ErrorMessages: Record<ErrorCode, string> = {
   [ErrorCodes.AUTH_BIOMETRIC_NOT_AVAILABLE]: 
     'Biometric authentication is not available on this device. Please set up Face ID or Touch ID in your device settings.',
@@ -148,34 +107,16 @@ export const ErrorMessages: Record<ErrorCode, string> = {
     'An unexpected error occurred. Please try again.',
 };
 
-// =============================================================================
-// ERROR PARSING UTILITIES
-// =============================================================================
-
-/**
- * Parse an unknown error into a WalletError with user-friendly message
- * 
- * @example
- * try {
- *   await sendTransaction();
- * } catch (error) {
- *   const walletError = parseError(error);
- *   showAlert(walletError.userMessage);
- * }
- */
+// Parse an unknown error into a WalletError with user-friendly message
 export function parseError(error: unknown): WalletError {
-  // Already a WalletError, return as-is
   if (error instanceof WalletError) {
     return error;
   }
 
   const originalError = error instanceof Error ? error : undefined;
   const message = originalError?.message || String(error);
-  
-  // Pattern match common error messages to provide better UX
   const lowerMessage = message.toLowerCase();
   
-  // Insufficient balance patterns
   if (lowerMessage.includes('insufficient') || 
       lowerMessage.includes('not enough') ||
       lowerMessage.includes('balance')) {
@@ -188,7 +129,6 @@ export function parseError(error: unknown): WalletError {
     });
   }
   
-  // Network error patterns
   if (lowerMessage.includes('network') || 
       lowerMessage.includes('timeout') ||
       lowerMessage.includes('connection')) {
@@ -201,7 +141,6 @@ export function parseError(error: unknown): WalletError {
     });
   }
   
-  // User cancelled patterns
   if (lowerMessage.includes('cancel') || 
       lowerMessage.includes('abort') ||
       lowerMessage.includes('user rejected')) {
@@ -214,7 +153,6 @@ export function parseError(error: unknown): WalletError {
     });
   }
   
-  // Token/SPL errors - TokenOwnerOffCurveError
   if (lowerMessage.includes('offcurve') || 
       lowerMessage.includes('off curve') ||
       lowerMessage.includes('tokenowneroffcurve')) {
@@ -227,7 +165,6 @@ export function parseError(error: unknown): WalletError {
     });
   }
   
-  // Invalid address patterns
   if (lowerMessage.includes('invalid') && lowerMessage.includes('address')) {
     return new WalletError({
       message,
@@ -238,7 +175,6 @@ export function parseError(error: unknown): WalletError {
     });
   }
   
-  // Default to unknown error
   return new WalletError({
     message,
     userMessage: ErrorMessages[ErrorCodes.UNKNOWN],
@@ -248,18 +184,9 @@ export function parseError(error: unknown): WalletError {
   });
 }
 
-// =============================================================================
-// LOGGING UTILITIES
-// =============================================================================
-
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-/**
- * Structured logger for consistent, developer-friendly output
- * 
- * In development: Logs to console with formatting
- * In production: Could be configured to send to logging service
- */
+// Structured logger for consistent output
 export const logger = {
   debug: (context: string, message: string, data?: object) => {
     logWithLevel('debug', context, message, data);

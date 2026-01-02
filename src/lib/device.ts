@@ -1,29 +1,11 @@
-/**
- * ============================================================================
- * CLIPBOARD & HAPTICS - Device utilities
- * ============================================================================
- */
+// Clipboard & haptics utilities
 
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 import { logger } from './errors';
 
-// =============================================================================
-// CLIPBOARD UTILITIES
-// =============================================================================
-
-/**
- * Copy text to clipboard
- * 
- * @returns true if successful, false otherwise
- * 
- * @example
- * const success = await copyToClipboard("5FHw...X6Pr");
- * if (success) {
- *   showToast("Address copied!");
- * }
- */
+// Copy text to clipboard
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {
     await Clipboard.setStringAsync(text);
@@ -35,11 +17,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-/**
- * Read text from clipboard
- * 
- * @returns Clipboard text or null if failed
- */
+// Read text from clipboard
 export async function readFromClipboard(): Promise<string | null> {
   try {
     const text = await Clipboard.getStringAsync();
@@ -50,32 +28,10 @@ export async function readFromClipboard(): Promise<string | null> {
   }
 }
 
-// =============================================================================
-// HAPTIC FEEDBACK
-// =============================================================================
-
-/**
- * Trigger haptic feedback
- * 
- * Types:
- * - 'light': Subtle feedback (e.g., button tap)
- * - 'medium': Standard feedback (e.g., selection change)
- * - 'heavy': Strong feedback (e.g., action completed)
- * - 'success': Success pattern
- * - 'warning': Warning pattern
- * - 'error': Error pattern
- * 
- * @example
- * // On button press
- * await hapticFeedback('light');
- * 
- * // On successful payment
- * await hapticFeedback('success');
- */
+// Trigger haptic feedback
 export async function hapticFeedback(
   type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error'
 ): Promise<void> {
-  // Haptics only work on iOS and Android, not web
   if (Platform.OS === 'web') {
     return;
   }
@@ -102,7 +58,6 @@ export async function hapticFeedback(
         break;
     }
   } catch (error) {
-    // Haptics can fail on some devices, don't crash the app
     logger.debug('Haptics', 'Haptic feedback failed (device may not support it)');
   }
 }

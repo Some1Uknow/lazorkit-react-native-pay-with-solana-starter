@@ -1,20 +1,8 @@
 /**
- * ============================================================================
- * useTransaction - Send gasless USDC transactions
- * ============================================================================
+ * useTransaction Hook
  * 
- * This hook handles:
- * - Creating USDC transfer instructions
- * - Signing via LazorKit
- * - Sending gasless transactions
- * - Tracking transaction state
- * - Error handling with user-friendly messages
- * 
- * WHY THIS HOOK EXISTS:
- * - Encapsulates all transaction logic in one place
- * - Provides clear state machine for UI
- * - Handles the complexity of SPL token transfers
- * - Makes gasless transactions easy to use
+ * This hook handles sending USDC payments with LazorKit.
+ * It manages the entire payment flow from validation to confirmation.
  */
 
 import { useWallet } from '@lazorkit/wallet-mobile-adapter';
@@ -22,55 +10,41 @@ import { createTransferInstruction, getAssociatedTokenAddress } from '@solana/sp
 import { PublicKey } from '@solana/web3.js';
 import { useCallback, useState } from 'react';
 import {
-  ErrorCodes,
-  ErrorMessages,
-  getExplorerTxUrl,
-  getRedirectUrl,
-  isValidPaymentAmount,
-  isValidSolanaAddress,
-  logger,
-  NETWORK,
-  parseError,
-  USDC_MINT,
-  usdcToBaseUnits,
-  WalletError,
+    ErrorCodes,
+    ErrorMessages,
+    getExplorerTxUrl,
+    getRedirectUrl,
+    isValidPaymentAmount,
+    isValidSolanaAddress,
+    logger,
+    NETWORK,
+    parseError,
+    USDC_MINT,
+    usdcToBaseUnits,
+    WalletError,
 } from '../lib';
 import type { Transaction, TransactionState } from '../types';
 
 // =============================================================================
-// HOOK RETURN TYPE
+// Types
 // =============================================================================
 
 export interface UseTransactionReturn {
-  /** Current transaction state */
   state: TransactionState;
-  
-  /** Current transaction (null if none in progress) */
   transaction: Transaction | null;
-  
-  /** Send a USDC payment */
   sendPayment: (params: SendPaymentParams) => Promise<string>;
-  
-  /** Reset state for new transaction */
   reset: () => void;
-  
-  /** Last error */
   error: WalletError | null;
-  
-  /** Explorer URL for last successful transaction */
   explorerUrl: string | null;
 }
 
 export interface SendPaymentParams {
-  /** Recipient wallet address */
   recipient: string;
-  
-  /** Amount in USDC (human-readable, e.g., 10.50) */
   amount: number;
 }
 
 // =============================================================================
-// HOOK IMPLEMENTATION
+// Hook
 // =============================================================================
 
 export function useTransaction(): UseTransactionReturn {
@@ -81,23 +55,10 @@ export function useTransaction(): UseTransactionReturn {
   const [error, setError] = useState<WalletError | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
 
-  /**
-   * Generate unique transaction ID
-   */
   const generateTxId = useCallback(() => {
     return `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   }, []);
 
-  /**
-   * Send a USDC payment
-   * 
-   * FLOW:
-   * 1. Validate inputs
-   * 2. Create transfer instruction
-   * 3. Sign with LazorKit (user authenticates with passkey)
-   * 4. Submit to network (via paymaster for gasless)
-   * 5. Return signature
-   */
   const sendPayment = useCallback(async (params: SendPaymentParams): Promise<string> => {
     const { recipient, amount } = params;
     
@@ -106,15 +67,10 @@ export function useTransaction(): UseTransactionReturn {
       amount,
     });
 
-    // Reset previous state
     setError(null);
     setSignature(null);
 
-    // ========================================
-    // STEP 1: VALIDATION
-    // ========================================
-    
-    // Check wallet is connected
+    // Validate wallet is connected
     if (!smartWalletPubkey) {
       const err = new WalletError({
         message: 'Wallet not connected',
@@ -153,10 +109,7 @@ export function useTransaction(): UseTransactionReturn {
       throw err;
     }
 
-    // ========================================
-    // STEP 2: CREATE TRANSACTION RECORD
-    // ========================================
-    
+    // Create transaction record
     const txId = generateTxId();
     const newTransaction: Transaction = {
       id: txId,
@@ -172,103 +125,55 @@ export function useTransaction(): UseTransactionReturn {
     setState('unsigned');
 
     try {
-      // ========================================
-      // STEP 3: CREATE TRANSFER INSTRUCTION
-      // ========================================
-      
       logger.debug('Transaction', 'Creating transfer instruction');
       
       const recipientPubkey = new PublicKey(recipient);
       const usdcMint = new PublicKey(USDC_MINT);
 
-      // Get Associated Token Accounts (ATAs)
-      // Every wallet needs a specific account for each token type
-      // IMPORTANT: allowOwnerOffCurve=true is required because:
-      // - LazorKit smart wallets are PDAs (Program Derived Addresses)
-      // - PDAs are intentionally "off curve" (not valid ed25519 public keys)
-      // - Without this flag, getAssociatedTokenAddress throws TokenOwnerOffCurveError
+      // Get token accounts for sender and recipient
+      // allowOwnerOffCurve=true is required for LazorKit smart wallets (PDAs)
       const sourceATA = await getAssociatedTokenAddress(
         usdcMint,
         smartWalletPubkey,
-        true  // allowOwnerOffCurve - required for PDA/smart wallet owners
+        true
       );
 
       const destinationATA = await getAssociatedTokenAddress(
         usdcMint,
         recipientPubkey,
-        true  // allowOwnerOffCurve - recipient might also be a smart wallet
+        true
       );
 
       // Create the transfer instruction
-      // IMPORTANT: USDC has 6 decimals, so we convert to base units
       const transferInstruction = createTransferInstruction(
-        sourceATA,                    // From: sender's USDC account
-        destinationATA,               // To: recipient's USDC account
-        smartWalletPubkey,            // Authority: who approves the transfer
-        usdcToBaseUnits(amount)       // Amount: in base units (1 USDC = 1,000,000)
+        sourceATA,
+        destinationATA,
+        smartWalletPubkey,
+        usdcToBaseUnits(amount)
       );
 
-      logger.debug('Transaction', 'Transfer instruction created', {
-        from: sourceATA.toString().slice(0, 8) + '...',
-        to: destinationATA.toString().slice(0, 8) + '...',
-        amount: usdcToBaseUnits(amount),
-      });
+      logger.debug('Transaction', 'Transfer instruction created');
 
-      // ========================================
-      // STEP 4: SIGN AND SEND VIA LAZORKIT (WITH RETRY)
-      // ========================================
-      
+      // Sign and send transaction
       setState('signing');
       setTransaction(prev => prev ? { ...prev, state: 'signing' } : null);
       
       logger.info('Transaction', 'Requesting signature via LazorKit');
 
-      // Retry up to 3 times for transaction size errors
-      let txSignature: string | null = null;
-      let lastError: Error | null = null;
-      const maxRetries = 3;
-      
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          logger.info('Transaction', `Attempt ${attempt}/${maxRetries}`);
-          
-          txSignature = await signAndSendTransaction(
-            {
-              instructions: [transferInstruction],
-              transactionOptions: {
-                feeToken: 'USDC',
-                clusterSimulation: NETWORK,
-              },
-            },
-            { redirectUrl: getRedirectUrl() }
-          );
-          
-          break;
-        } catch (err) {
-          lastError = err instanceof Error ? err : new Error(String(err));
-          const isTransactionTooLarge = lastError.message.toLowerCase().includes('transaction too large');
-          
-          if (isTransactionTooLarge && attempt < maxRetries) {
-            logger.warn('Transaction', `Attempt ${attempt} failed, retrying...`);
-            await new Promise(resolve => setTimeout(resolve, 500));
-            continue;
-          }
-          
-          throw lastError;
-        }
-      }
-      
-      if (!txSignature) {
-        throw lastError || new Error('Transaction failed');
-      }
+      const txSignature = await signAndSendTransaction(
+        {
+          instructions: [transferInstruction],
+          transactionOptions: {
+            feeToken: 'USDC',
+            clusterSimulation: NETWORK,
+          },
+        },
+        { redirectUrl: getRedirectUrl() }
+      );
 
-      // ========================================
-      // STEP 5: SUCCESS
-      // ========================================
-      
+      // Transaction successful
       logger.info('Transaction', 'Transaction successful!', { 
         signature: txSignature,
-        explorerUrl: getExplorerTxUrl(txSignature),
       });
 
       setSignature(txSignature);
@@ -283,10 +188,6 @@ export function useTransaction(): UseTransactionReturn {
       return txSignature;
 
     } catch (err) {
-      // ========================================
-      // ERROR HANDLING
-      // ========================================
-      
       const walletError = parseError(err);
       setError(walletError);
       setState('failed');
@@ -297,24 +198,16 @@ export function useTransaction(): UseTransactionReturn {
       } : null);
       
       logger.error('Transaction', 'Transaction failed', err);
-      
       throw walletError;
     }
   }, [smartWalletPubkey, signAndSendTransaction, generateTxId]);
 
-  /**
-   * Reset state for new transaction
-   */
   const reset = useCallback(() => {
     setState('unsigned');
     setTransaction(null);
     setError(null);
     setSignature(null);
   }, []);
-
-  // ==========================================================================
-  // RETURN
-  // ==========================================================================
 
   return {
     state,
