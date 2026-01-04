@@ -11,7 +11,28 @@
 
 ---
 
-## 📖 Table of Contents
+## � App Preview
+
+<div align="center">
+  <img src="./assets/firstpage.jpeg" alt="First Page" width="250" />
+  <img src="./assets/homepage.jpeg" alt="Home Screen" width="250" />
+  <img src="./assets/request-payment.jpeg" alt="Request Payment" width="250" />
+</div>
+
+<div align="center">
+  <img src="./assets/receive-payment.jpeg" alt="Receive Payment" width="250" />
+  <img src="./assets/payment-sent.jpeg" alt="Payment Sent" width="250" />
+</div>
+
+### 🎥 Video Demo
+
+https://github.com/user-attachments/assets/full-demo.mp4
+
+> **See the full payment flow in action** - from authentication to gasless transaction confirmation.
+
+---
+
+## �📖 Table of Contents
 
 1. [What Is This?](#-what-is-this)
 2. [Why LazorKit & Passkeys?](#-why-lazorkit--passkeys)
