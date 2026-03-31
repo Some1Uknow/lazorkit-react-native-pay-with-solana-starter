@@ -26,7 +26,15 @@
 
 ### 🎥 Video Demo
 
-https://github.com/user-attachments/assets/full-demo.mp4
+<div align="center">
+  <a href="./assets/full-demo.mp4">
+    <img src="./assets/homepage.jpeg" alt="Open the full video demo" width="250" />
+  </a>
+</div>
+
+<p align="center">
+  <a href="./assets/full-demo.mp4">Open the GitHub-friendly MP4 demo</a>
+</p>
 
 > **See the full payment flow in action** - from authentication to gasless transaction confirmation.
 
